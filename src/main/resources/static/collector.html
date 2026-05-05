@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>采集源控制 - MTS-LSMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f1f3f5; }
+        .config-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .status-online { background-color: #28a745; box-shadow: 0 0 8px #28a745; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+        <span class="navbar-brand">🛡️ MTS-LSMS 终端采集控制台</span>
+        <div class="navbar-nav">
+            <a class="nav-link" href="/index.html">返回审计大屏</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="config-card mb-4">
+                <h5 class="mb-4">➕ 新增采集源 (Watch Config)</h5>
+                <form id="configForm">
+                    <div class="mb-3">
+                        <label class="form-label">终端标识 (Terminal ID)</label>
+                        <input type="text" class="form-control" id="termId" placeholder="例如: web-server-01">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">监控目录路径</label>
+                        <input type="text" class="form-control" id="watchDir" placeholder="C:/logs/apache">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">日志后缀</label>
+                        <input type="text" class="form-control" id="extensions" value=".log, .txt">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">立即启动监听</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="config-card">
+                <h5 class="mb-4">🧪 日志仿真测试 (Simulation)</h5>
+                <p class="text-muted small">点击下方按钮将向当前监控的文件中追加一行“模拟攻击”日志，测试系统报警速度。</p>
+
+                <div class="mb-3">
+                    <select id="mockType" class="form-select mb-2">
+                        <option value="LOGIN_FAILED">模拟：多次登录失败 (Brute Force)</option>
+                        <option value="SQL_INJECTION">模拟：SQL 注入尝试</option>
+                        <option value="SYSTEM_INFO">模拟：普通系统心跳</option>
+                    </select>
+                    <button id="btnMock" class="btn btn-warning w-100">写入一行测试日志</button>
+                </div>
+
+                <hr>
+
+                <h6 class="mt-4">当前采集器状态</h6>
+                <div class="p-3 bg-light rounded">
+                    <div><span class="status-indicator status-online"></span> WatchService: <strong class="text-success">RUNNING</strong></div>
+                    <div class="mt-2 small text-secondary">已读取行数: <span id="linesRead">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 模拟写入日志的逻辑 (需要后端配合一个测试接口)
+    document.getElementById('btnMock').addEventListener('click', async () => {
+        const type = document.getElementById('mockType').value;
+        const res = await fetch('/api/test/mock-log?type=' + type, { method: 'POST' });
+        if(res.ok) alert('测试日志已写入文件，请观察审计大屏！');
+    });
+
+    document.getElementById('configForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        alert('配置已发送！WatchService 正在重载...');
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>MTS-LSMS 安全日志监测系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background-color: #2c3e50; }
+        .log-table { background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .panel-card { min-height: 180px; }
+        .chart-box { height: 260px; }
+        .badge-HIGH { background-color: #dc3545; }
+        .badge-MEDIUM { background-color: #ffc107; color: #000; }
+        .badge-LOW { background-color: #17a2b8; }
+        .badge-system { background-color: #6c757d; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark mb-4">
+    <div class="container d-flex justify-content-between">
+        <span class="navbar-brand mb-0 h1">🛡️ MTS-LSMS 多终端安全监测系统</span>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-light btn-sm" href="/index.html">首页</a>
+            <a class="btn btn-outline-light btn-sm" href="/collector.html">终端采集控制</a>
+            <a class="btn btn-outline-light btn-sm" href="/events.html">事件列表</a>
+            <a class="btn btn-outline-light btn-sm" href="/stats.html">统计分析</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary panel-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">系统状态</h5>
+                    <p class="card-text fs-4">运行中 (Active)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-dark panel-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">当前日志总数</h5>
+                    <p id="totalLogs" class="card-text fs-4">加载中...</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-danger panel-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">24小时安全事件</h5>
+                    <p id="event24h" class="card-text fs-4">加载中...</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mt-3">
+            <div class="card text-white bg-success panel-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">已接入终端数</h5>
+                    <p id="terminalCount" class="card-text fs-4">加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="log-table p-3">
+                <h5 class="mb-2">近7日日志趋势</h5>
+                <div id="trendChart" class="chart-box"></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="log-table p-3">
+                <h5 class="mb-2">事件等级分布</h5>
+                <div id="eventLevelChart" class="chart-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="log-table p-4">
+        <h4 class="mb-4">实时安全审计日志</h4>
+        <div class="row g-2 mb-3">
+            <div class="col-md-3">
+                <input id="filterTerminalId" class="form-control" placeholder="按终端ID筛选，例如 pc-01">
+            </div>
+            <div class="col-md-2">
+                <input id="filterIp" class="form-control" placeholder="按IP筛选，例如 192.168.1.10">
+            </div>
+            <div class="col-md-2">
+                <select id="filterType" class="form-select">
+                    <option value="">全部类型</option>
+                    <option value="login_success">login_success</option>
+                    <option value="login_failed">login_failed</option>
+                    <option value="access">access</option>
+                    <option value="error">error</option>
+                    <option value="system">system</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <input id="filterStart" type="datetime-local" class="form-control">
+            </div>
+            <div class="col-md-1">
+                <input id="filterEnd" type="datetime-local" class="form-control">
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button id="applyFilterBtn" class="btn btn-primary w-50">应用筛选</button>
+                <button id="resetFilterBtn" class="btn btn-outline-secondary w-50">重置</button>
+            </div>
+        </div>
+        <table class="table table-hover">
+            <thead class="table-light">
+            <tr>
+                <th>终端ID</th>
+                <th>来源 IP</th>
+                <th>日志类型</th>
+                <th>消息内容</th>
+                <th>记录时间</th>
+            </tr>
+            </thead>
+            <tbody id="logContent">
+            </tbody>
+        </table>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span id="pageInfo" class="text-muted small">第 1 页 / 共 1 页（0 条）</span>
+            <div class="btn-group">
+                <button id="prevPageBtn" class="btn btn-outline-primary btn-sm">上一页</button>
+                <button id="nextPageBtn" class="btn btn-outline-primary btn-sm">下一页</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const trendChart = echarts.init(document.getElementById('trendChart'));
+    const levelChart = echarts.init(document.getElementById('eventLevelChart'));
+    const filters = {
+        terminalId: '',
+        ip: '',
+        type: '',
+        startTime: '',
+        endTime: ''
+    };
+    const pagination = {
+        page: 0,
+        size: 12,
+        totalPages: 1,
+        totalElements: 0
+    };
+
+    async function fetchOverview() {
+        const response = await fetch('/api/stats/overview');
+        return response.json();
+    }
+
+    async function fetchTrend() {
+        const response = await fetch('/api/stats/trend?days=7');
+        return response.json();
+    }
+
+    async function fetchEventLevels() {
+        const response = await fetch('/api/stats/event-levels?days=7');
+        return response.json();
+    }
+
+    async function fetchLogs() {
+        try {
+            const params = new URLSearchParams({
+                page: String(pagination.page),
+                size: String(pagination.size),
+                sort: 'time,desc'
+            });
+            if (filters.ip) params.set('ip', filters.ip);
+            if (filters.terminalId) params.set('terminalId', filters.terminalId);
+            if (filters.type) params.set('type', filters.type);
+            if (filters.startTime) params.set('startTime', filters.startTime);
+            if (filters.endTime) params.set('endTime', filters.endTime);
+
+            const response = await fetch(`/api/logs?${params.toString()}`);
+            const data = await response.json();
+            pagination.totalPages = Math.max(data.totalPages || 1, 1);
+            pagination.totalElements = data.totalElements || 0;
+
+            // 更新表格内容
+            const tbody = document.getElementById('logContent');
+            tbody.innerHTML = data.content.map(log => `
+                    <tr>
+                        <td><code>${log.terminalId || 'unknown-terminal'}</code></td>
+                        <td><code>${log.ip || '0.0.0.0'}</code></td>
+                        <td><span class="badge badge-system">${log.type || 'system'}</span></td>
+                        <td>${log.content || ''}</td>
+                        <td class="text-muted small">${log.time ? new Date(log.time).toLocaleString() : '-'}</td>
+                    </tr>
+                `).join('');
+            if (!data.content.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无日志数据</td></tr>';
+            }
+            updatePaginationView();
+        } catch (error) {
+            console.error('获取日志失败:', error);
+        }
+    }
+
+    function updatePaginationView() {
+        document.getElementById('pageInfo').innerText =
+            `第 ${pagination.page + 1} 页 / 共 ${pagination.totalPages} 页（${pagination.totalElements} 条）`;
+        document.getElementById('prevPageBtn').disabled = pagination.page <= 0;
+        document.getElementById('nextPageBtn').disabled = pagination.page >= pagination.totalPages - 1;
+    }
+
+    function applyFilters() {
+        pagination.page = 0;
+        filters.terminalId = document.getElementById('filterTerminalId').value.trim();
+        filters.ip = document.getElementById('filterIp').value.trim();
+        filters.type = document.getElementById('filterType').value;
+        filters.startTime = document.getElementById('filterStart').value;
+        filters.endTime = document.getElementById('filterEnd').value;
+        fetchLogs();
+    }
+
+    function resetFilters() {
+        document.getElementById('filterTerminalId').value = '';
+        document.getElementById('filterIp').value = '';
+        document.getElementById('filterType').value = '';
+        document.getElementById('filterStart').value = '';
+        document.getElementById('filterEnd').value = '';
+        filters.terminalId = '';
+        filters.ip = '';
+        filters.type = '';
+        filters.startTime = '';
+        filters.endTime = '';
+        pagination.page = 0;
+        fetchLogs();
+    }
+
+    function goPrevPage() {
+        if (pagination.page <= 0) return;
+        pagination.page -= 1;
+        fetchLogs();
+    }
+
+    function goNextPage() {
+        if (pagination.page >= pagination.totalPages - 1) return;
+        pagination.page += 1;
+        fetchLogs();
+    }
+
+    async function refreshDashboard() {
+        try {
+            const [overview, trend, eventLevels] = await Promise.all([
+                fetchOverview(),
+                fetchTrend(),
+                fetchEventLevels()
+            ]);
+
+            document.getElementById('totalLogs').innerText = overview.totalLogs ?? 0;
+            document.getElementById('event24h').innerText = overview.eventsLast24Hours ?? 0;
+            document.getElementById('terminalCount').innerText = overview.connectedTerminals ?? 0;
+
+            trendChart.setOption({
+                tooltip: { trigger: 'axis' },
+                xAxis: { type: 'category', data: trend.map(item => item.date) },
+                yAxis: { type: 'value' },
+                series: [{
+                    name: '日志数量',
+                    type: 'line',
+                    smooth: true,
+                    areaStyle: {},
+                    data: trend.map(item => item.count)
+                }]
+            });
+
+            levelChart.setOption({
+                tooltip: { trigger: 'item' },
+                series: [{
+                    name: '事件等级',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    data: eventLevels.map(item => ({ value: item.count, name: item.level }))
+                }]
+            });
+        } catch (error) {
+            console.error('刷新看板失败:', error);
+        }
+    }
+
+    // 页面加载执行一次，之后每5秒刷新一次
+    refreshDashboard();
+    fetchLogs();
+    document.getElementById('applyFilterBtn').addEventListener('click', applyFilters);
+    document.getElementById('resetFilterBtn').addEventListener('click', resetFilters);
+    document.getElementById('prevPageBtn').addEventListener('click', goPrevPage);
+    document.getElementById('nextPageBtn').addEventListener('click', goNextPage);
+    setInterval(refreshDashboard, 10000);
+    setInterval(fetchLogs, 5000);
+</script>
+</body>
+</html>
